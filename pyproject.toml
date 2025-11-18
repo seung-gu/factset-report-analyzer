@@ -23,6 +23,7 @@ factset-data-collector = "main:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/chart_ocr_processor"]
+force-include = { "main.py" = "main.py" }
 
 [build-system]
 requires = ["hatchling"]
