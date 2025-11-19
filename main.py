@@ -28,10 +28,7 @@ def main():
     # Process images
     df = process_images(
         directory=estimates_dir,
-        output_csv=output_csv,
-        use_coordinate_matching=True,
-        classify_bars=True,
-        use_multiple_methods=True
+        output_csv=output_csv
     )
     
     print()

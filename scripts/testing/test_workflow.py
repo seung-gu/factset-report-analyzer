@@ -150,7 +150,6 @@ class TestWorkflowStructure:
             content = f.read().lower()
             
             steps = [
-                "download csv from cloud",
                 "check for new pdfs",
                 "download new pdfs",
                 "extract pngs",

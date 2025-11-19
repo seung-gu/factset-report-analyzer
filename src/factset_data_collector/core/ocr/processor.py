@@ -23,19 +23,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def process_image(
-    image_path: Path,
-    use_coordinate_matching: bool = True,
-    classify_bars: bool = True,
-    use_multiple_methods: bool = True
-) -> list[dict]:
+def process_image(image_path: Path) -> list[dict]:
     """Extract quarter and EPS information from a single image.
     
     Args:
         image_path: Image file path
-        use_coordinate_matching: Whether to use coordinate-based matching (default: True)
-        classify_bars: Whether to perform bar graph classification (default: True)
-        use_multiple_methods: Whether to use all 3 methods for bar classification (default: True)
         
     Returns:
         List of dictionaries containing quarter and EPS information
@@ -49,31 +41,23 @@ def process_image(
             logger.warning(f"No OCR results for image: {image_path}")
             return []
         
-        if use_coordinate_matching:
-            # Coordinate-based matching
-            matched_results = match_quarters_with_numbers(ocr_results)
-            logger.debug(f"Matched results count: {len(matched_results)}")
-            
-            if classify_bars:
-                # Bar graph classification
-                image = cv2.imread(str(image_path))
-                if image is None:
-                    logger.error(f"Cannot read image: {image_path}")
-                    return []
-                
-                matched_results = classify_all_bars(
-                    image,
-                    matched_results,
-                    use_multiple_methods=use_multiple_methods
-                )
-            
-            results = matched_results
-        else:
-            # Legacy method (text-based parsing)
-            text = extract_text_from_image(image_path)
-            results = extract_quarter_eps_pairs(text)
+        # Coordinate-based matching
+        matched_results = match_quarters_with_numbers(ocr_results)
+        logger.debug(f"Matched results count: {len(matched_results)}")
         
-        if not results:
+        # Bar graph classification
+        image = cv2.imread(str(image_path))
+        if image is None:
+            logger.error(f"Cannot read image: {image_path}")
+            return []
+        
+        matched_results = classify_all_bars(
+            image,
+            matched_results,
+            use_multiple_methods=True
+        )
+        
+        if not matched_results:
             logger.warning(f"No matched results for image: {image_path}")
             return []
         
@@ -82,7 +66,7 @@ def process_image(
         
         # Organize results
         processed_results = []
-        for result in results:
+        for result in matched_results:
             processed_result = {
                 'report_date': report_date,
                 'quarter': result.get('quarter', ''),
@@ -108,9 +92,6 @@ def process_image(
 def process_directory(
     directory: Path,
     output_csv: Path | None = None,
-    use_coordinate_matching: bool = True,
-    classify_bars: bool = True,
-    use_multiple_methods: bool = True,
     limit: int | None = None
 ) -> pd.DataFrame:
     """Process all images in a directory.
@@ -118,9 +99,6 @@ def process_directory(
     Args:
         directory: Directory path containing images
         output_csv: CSV file path to save results (None to skip saving)
-        use_coordinate_matching: Whether to use coordinate-based matching
-        classify_bars: Whether to perform bar graph classification
-        use_multiple_methods: Whether to use all 3 methods for bar classification
         limit: Maximum number of images to process (None to process all)
         
     Returns:
@@ -172,7 +150,7 @@ def process_directory(
         print(f"[{idx}/{total_images}] {image_path.name}", end=" ... ")
         
         try:
-            results = process_image(image_path, use_coordinate_matching, classify_bars, use_multiple_methods)
+            results = process_image(image_path)
             if not results:
                 logger.warning(f"No data extracted from {image_path.name}")
                 print("⚠️  No data")
