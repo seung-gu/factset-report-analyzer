@@ -19,12 +19,8 @@ dependencies = [
 r2 = ["boto3>=1.28.0"]
 dev = ["pytest>=7.4.0", "pytest-cov>=4.1.0"]
 
-[project.scripts]
-factset-data-collector = "main:main"
-
 [tool.hatch.build.targets.wheel]
 packages = ["src/factset_data_collector"]
-force-include = { "main.py" = "main.py" }
 
 [build-system]
 requires = ["hatchling"]
