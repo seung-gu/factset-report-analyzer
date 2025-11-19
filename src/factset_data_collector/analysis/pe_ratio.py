@@ -141,42 +141,36 @@ def _get_quarter_eps_sum(
 
 
 def calculate_pe_ratio(
-    price_data: pd.DataFrame | dict | None = None,
-    type: Literal['forward', 'mix', 'trailing-like'] = 'forward',
-    output_csv: Path | str | None = None
+    type: Literal['forward', 'mix', 'trailing-like'] = 'forward'
 ) -> pd.DataFrame:
-    """Calculate P/E ratios from EPS estimates.
+    """Calculate P/E ratios from EPS estimates using S&P 500 prices.
     
-    Calculates Price-to-Earnings (P/E) ratios using 4-quarter EPS sums and stock prices.
+    Calculates Price-to-Earnings (P/E) ratios using 4-quarter EPS sums and S&P 500 stock prices.
     EPS is calculated as the sum of 4 quarters based on the type:
     - forward: Q[1:5] - Next 4 quarters after report date (skip first, take next 4)
     - mix: Q[0:4] - Report date and next 3 quarters (include report date, take next 3)
     - trailing-like: Q[-3:1] - Last 3 quarters before and report date (take 3 before, include report date)
     
     Args:
-        price_data: Stock price data. Can be:
-            - DataFrame with columns: Date (or Report_Date), Price
-            - Dict mapping dates (YYYY-MM-DD) to prices
-            - None: Returns template DataFrame showing required format
         type: Type of P/E ratio to calculate:
             - 'forward': Q[1:5] - Next 4 quarters after report date (skip first, take next 4)
             - 'mix': Q[0:4] - Report date and next 3 quarters (include report date, take next 3)
             - 'trailing-like': Q[-3:1] - Last 3 quarters before and report date (take 3 before, include report date)
-        output_csv: Optional path to save results as CSV file
         
     Returns:
         DataFrame with P/E ratios:
         - Report_Date: Report date
         - Price_Date: Date of price used (most recent price on or before report_date)
-        - Price: Stock price used
+        - Price: S&P 500 stock price used
         - EPS_4Q_Sum: 4-quarter EPS sum used for calculation
         - PE_Ratio: Calculated P/E ratio (Price / EPS_4Q_Sum)
         - Type: Type of calculation ('forward', 'trailing-like', or 'mix')
         
     Note:
         Stock prices are matched to the most recent price on or before the report date.
-        If output_csv is provided, results are automatically saved to CSV.
         EPS data is always loaded from public URL.
+        S&P 500 (^GSPC) data is automatically loaded from yfinance.
+        Requires yfinance package: pip install yfinance or uv add yfinance
     """
     # Auto-load from public URL
     temp_path = Path(tempfile.gettempdir()) / "extracted_estimates.csv"
@@ -190,59 +184,57 @@ def calculate_pe_ratio(
     
     df_eps['Report_Date'] = pd.to_datetime(df_eps['Report_Date'])
     
-    # If no price data provided, return template
-    if price_data is None:
-        print("⚠️  No price data provided. Returning template DataFrame.")
-        print("   Please provide price_data as DataFrame or dict mapping dates to prices.")
-        
-        template = pd.DataFrame({
-            'Report_Date': df_eps['Report_Date'],
-            'PE_Ratio': None,
-            'EPS_4Q_Sum': None,
-            'Price': None,
-            'Note': 'Price data required'
-        })
-        return template
+    # Determine date range from EPS data (use actual CSV date range)
+    min_date = df_eps['Report_Date'].min()
+    max_date = df_eps['Report_Date'].max()
+    start_date = min_date.strftime('%Y-%m-%d')
+    end_date = max_date.strftime('%Y-%m-%d')
     
-    # Convert price_data to DataFrame if dict
-    if isinstance(price_data, dict):
-        price_df = pd.DataFrame([
-            {'Date': k, 'Price': v} for k, v in price_data.items()
-        ])
-        price_df['Date'] = pd.to_datetime(price_df['Date'])
-    else:
-        price_df = price_data.copy()
-        if 'Date' not in price_df.columns and 'Report_Date' in price_df.columns:
-            price_df['Date'] = pd.to_datetime(price_df['Report_Date'])
-        else:
-            price_df['Date'] = pd.to_datetime(price_df['Date'])
+    # Auto-load S&P 500 price data
+    try:
+        import yfinance as yf
+        print(f"📈 Loading S&P 500 price data from yfinance ({start_date} to {end_date})...")
+        sp500 = yf.Ticker('^GSPC')
+        hist = sp500.history(start=start_date, end=end_date)
+        price_dict = {date.strftime('%Y-%m-%d'): float(close) for date, close in zip(hist.index, hist['Close'])}
+        print(f"✅ Loaded {len(price_dict)} S&P 500 price points")
+    except ImportError:
+        raise ImportError(
+            "yfinance is required for automatic S&P 500 price loading. "
+            "Install it with: pip install yfinance or uv add yfinance"
+        )
+    except Exception as e:
+        raise Exception(f"Failed to load S&P 500 price data: {e}")
+    
+    # Convert price_dict to DataFrame
+    price_df = pd.DataFrame([
+        {'Date': k, 'Price': v} for k, v in price_dict.items()
+    ])
+    price_df['Date'] = pd.to_datetime(price_df['Date'])
     
     # Get quarter columns
     quarter_cols = [col for col in df_eps.columns if col != 'Report_Date']
     
-    # Calculate P/E ratios
+    # Use only dates that have price data (trading days only)
+    df_eps_sorted = df_eps.sort_values('Report_Date')
+    
+    # Calculate P/E ratios for each price date
     results = []
     
-    for _, row in df_eps.iterrows():
-        report_date = row['Report_Date']
+    for _, price_row in price_df.iterrows():
+        price_date = price_row['Date']
+        price = float(price_row['Price'])
         
-        # Find closest price (use price on or before report_date)
-        price_candidates = price_df[price_df['Date'] <= report_date]
-        if price_candidates.empty:
-            # If no price before report_date, use closest price
-            price_row = price_df.iloc[(price_df['Date'] - report_date).abs().argsort()[:1]]
-        else:
-            # Use most recent price before or on report_date
-            price_row = price_candidates.iloc[[price_candidates['Date'].idxmax()]]
-        
-        if price_row.empty:
+        # Find most recent EPS row on or before this price date
+        eps_candidates = df_eps_sorted[df_eps_sorted['Report_Date'] <= price_date]
+        if eps_candidates.empty:
             continue
         
-        price = float(price_row['Price'].iloc[0])
-        price_date = price_row['Date'].iloc[0]
+        eps_row = eps_candidates.iloc[-1]
+        report_date = eps_row['Report_Date']
         
-        # Calculate 4-quarter EPS sum based on type
-        eps_sum = _get_quarter_eps_sum(row, quarter_cols, report_date, type)
+        # Calculate 4-quarter EPS sum based on type (use report_date for EPS calculation)
+        eps_sum = _get_quarter_eps_sum(eps_row, quarter_cols, report_date, type)
         
         if eps_sum and eps_sum > 0:
             pe_ratio = price / eps_sum
@@ -259,14 +251,5 @@ def calculate_pe_ratio(
         return pd.DataFrame(columns=['Report_Date', 'Price_Date', 'Price', 'EPS_4Q_Sum', 'PE_Ratio', 'Type'])
     
     df_result = pd.DataFrame(results)
-    
-    # Save to CSV if output path provided
-    if output_csv:
-        if isinstance(output_csv, str):
-            output_csv = Path(output_csv)
-        output_csv.parent.mkdir(parents=True, exist_ok=True)
-        df_result.to_csv(output_csv, index=False)
-        print(f"✅ P/E ratio data saved to: {output_csv}")
-    
     return df_result
 
