@@ -39,6 +39,7 @@ jobs:
       - name: Configure Cloudflare R2 credentials
         run: |
           echo "R2_BUCKET_NAME=${{ secrets.R2_BUCKET_NAME }}" >> $GITHUB_ENV
+          echo "R2_PUBLIC_BUCKET_NAME=${{ secrets.R2_PUBLIC_BUCKET_NAME }}" >> $GITHUB_ENV
           echo "R2_ACCOUNT_ID=${{ secrets.R2_ACCOUNT_ID }}" >> $GITHUB_ENV
           echo "R2_ACCESS_KEY_ID=${{ secrets.R2_ACCESS_KEY_ID }}" >> $GITHUB_ENV
           echo "R2_SECRET_ACCESS_KEY=${{ secrets.R2_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
