@@ -160,17 +160,29 @@ def main():
             print("-" * 80)
             print(" ☁️  Step 5: Uploading results to cloud...")
             
-            uploaded_pdfs = sum(1 for p in pdf_files if upload_to_cloud(p, f"reports/{p.name}"))
-            uploaded_pngs = sum(1 for p in chart_files if upload_to_cloud(p, f"estimates/{p.name}"))
+            failed_pdfs = [p.name for p in pdf_files if not upload_to_cloud(p, f"reports/{p.name}")]
+            failed_pngs = [p.name for p in chart_files if not upload_to_cloud(p, f"estimates/{p.name}")]
+            
+            if failed_pdfs:
+                raise Exception(f"Failed to upload PDFs: {', '.join(failed_pdfs)}")
+            if failed_pngs:
+                raise Exception(f"Failed to upload PNGs: {', '.join(failed_pngs)}")
+            
+            print(f"✅ Uploaded {len(pdf_files)} PDF(s), {len(chart_files)} PNG(s)")
             
             from src.factset_data_collector.utils.cloudflare import write_csv_to_cloud
-            write_csv_to_cloud(df_main, "extracted_estimates.csv")
-            write_csv_to_cloud(df_confidence, "extracted_estimates_confidence.csv")
             
-            print(f"✅ Uploaded {uploaded_pdfs} PDF(s), {uploaded_pngs} PNG(s) to cloud")
+            if not write_csv_to_cloud(df_main, "extracted_estimates.csv"):
+                raise Exception("Failed to upload extracted_estimates.csv")
+            if not write_csv_to_cloud(df_confidence, "extracted_estimates_confidence.csv"):
+                raise Exception("Failed to upload extracted_estimates_confidence.csv") 
+            
+            print(f"✅ Uploaded extracted_estimates.csv and extracted_estimates_confidence.csv")
+            
     except Exception as e:
-        print(f"❌ PDF download failed: {e}\n")
-        return
+        print(f"❌ Workflow failed: {e}\n")
+        import sys
+        sys.exit(1)
     
     print()
     print("=" * 80)
