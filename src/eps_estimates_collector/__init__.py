@@ -7,7 +7,7 @@ This package provides a comprehensive toolkit for:
 - Calculating P/E ratios from EPS estimates
 
 Example:
-    >>> from eps_estimates_collector import download_pdfs, extract_charts, process_images, calculate_pe_ratio
+    >>> from eps_estimates_collector import download_pdfs, extract_charts, process_images, fetch_sp500_pe_ratio
     >>> from datetime import datetime
     >>> from pathlib import Path
     >>> 
@@ -27,8 +27,8 @@ Example:
     ...     output_csv=Path("output/estimates.csv")
     ... )
     >>> 
-    >>> # Calculate P/E ratios
-    >>> pe_df = calculate_pe_ratio(
+    >>> # Fetch P/E ratios
+    >>> pe_df = fetch_sp500_pe_ratio(
     ...     csv_path=Path("output/estimates.csv"),
     ...     price_data={'2024-01-15': 150.5, '2024-02-15': 152.3},
     ...     type='forward'
@@ -36,14 +36,14 @@ Example:
 """
 
 from .core import download_pdfs, extract_charts, process_images, process_image
-from .analysis import calculate_pe_ratio
+from .analysis import fetch_sp500_pe_ratio
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = [
     'download_pdfs',
     'extract_charts',
     'process_images',
     'process_image',
-    'calculate_pe_ratio',
+    'fetch_sp500_pe_ratio',
 ]

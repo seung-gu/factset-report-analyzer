@@ -23,6 +23,7 @@ from src.eps_estimates_collector.utils import (
     list_cloud_files,
     upload_to_cloud,
 )
+from src.eps_estimates_collector.utils.cloudflare import write_csv_to_cloud, upload_file_to_public_cloud
 import pandas as pd
 
 
@@ -170,14 +171,32 @@ def main():
             
             print(f"✅ Uploaded {len(pdf_files)} PDF(s), {len(chart_files)} PNG(s)")
             
-            from src.eps_estimates_collector.utils.cloudflare import write_csv_to_cloud
-            
             if not write_csv_to_cloud(df_main, "extracted_estimates.csv"):
                 raise Exception("Failed to upload extracted_estimates.csv")
             if not write_csv_to_cloud(df_confidence, "extracted_estimates_confidence.csv"):
                 raise Exception("Failed to upload extracted_estimates_confidence.csv") 
             
             print(f"✅ Uploaded extracted_estimates.csv and extracted_estimates_confidence.csv")
+            
+            # Step 6: Generate and upload P/E ratio plot to public bucket
+            print("-" * 80)
+            print(" 📊 Step 6: Generating P/E ratio plot...")
+            
+            try:
+                from src.eps_estimates_collector.analysis.pe_ratio import plot_pe_ratio_with_price
+                
+                plot_path = tmp_path / "pe_ratio_plot.png"
+                plot_pe_ratio_with_price(output_path=plot_path)
+                
+                # Upload to public bucket
+                if upload_file_to_public_cloud(plot_path, "pe_ratio_plot.png"):
+                    print("✅ Uploaded pe_ratio_plot.png to public bucket")
+                else:
+                    print("⚠️  Failed to upload pe_ratio_plot.png")
+            except Exception as e:
+                print(f"⚠️  Could not generate P/E ratio plot: {e}")
+                import traceback
+                traceback.print_exc()
             
     except Exception as e:
         print(f"❌ Workflow failed: {e}\n")

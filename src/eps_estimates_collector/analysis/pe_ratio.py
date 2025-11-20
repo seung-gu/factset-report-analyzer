@@ -5,10 +5,16 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
+
+# Type definitions
+PE_RATIO_TYPE = Literal['forward', 'trailing']
 import re
 import tempfile
 
 import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import numpy as np
 
 from ..utils.csv_storage import read_csv
 
@@ -50,7 +56,7 @@ def _get_quarter_eps_sum(
     row: pd.Series,
     quarter_cols: list[str],
     report_date: datetime,
-    type: Literal['forward', 'trailing-like', 'mix']
+    type: PE_RATIO_TYPE
 ) -> float | None:
     """Calculate 4-quarter EPS sum based on type.
     
@@ -59,30 +65,25 @@ def _get_quarter_eps_sum(
         quarter_cols: List of quarter column names
         report_date: Report date
         type: Type of EPS calculation:
-            - 'forward': Q[1:5] - Next 4 quarters after report_date (indices 1-4)
-            - 'mix': Q[0:4] - Report date and next 3 quarters (indices 0-3)
-            - 'trailing-like': Q[-3:1] - Last 3 quarters before and report date (indices -3 to 0)
+            - 'forward': Q(0)+Q(1)+Q(2)+Q(3) - Report date quarter and next 3 quarters
+            - 'trailing': Q(-4)+Q(-3)+Q(-2)+Q(-1) - Last 4 quarters before report date
         
     Returns:
         4-quarter EPS sum, or None if insufficient data
     """
-    # Parse all quarters and their dates
-    quarter_data = []
-    for col in quarter_cols:
-        val = row[col]
-        if pd.notna(val) and str(val).strip() and str(val) != '':
-            try:
-                eps_val = float(str(val).replace('*', '').strip())
-                if eps_val > 0:
-                    quarter_date = _parse_quarter_to_date(col)
-                    if quarter_date:
-                        quarter_data.append({
-                            'quarter': col,
-                            'eps': eps_val,
-                            'date': quarter_date
-                        })
-            except (ValueError, TypeError):
-                continue
+    # Parse valid quarters with their dates
+    quarter_data = [
+        {
+            'quarter': col,
+            'eps': float(str(val).replace('*', '').strip()),
+            'date': _parse_quarter_to_date(col)
+        }
+        for col in quarter_cols
+        if (val := row[col]) is not None
+        and str(val).strip()
+        and (eps_val := float(str(val).replace('*', '').strip())) > 0
+        and (q_date := _parse_quarter_to_date(col)) is not None
+    ]
     
     if not quarter_data:
         return None
@@ -90,72 +91,47 @@ def _get_quarter_eps_sum(
     # Sort by date
     quarter_data.sort(key=lambda x: x['date'])
     
-    # Find report_date position in sorted quarters
-    report_idx = None
-    for i, q in enumerate(quarter_data):
-        if q['date'] >= report_date:
-            report_idx = i
-            break
+    # Find the quarter that report_date belongs to
+    # A quarter spans from q['date'] to (but not including) the next quarter's date
+    report_quarter = next(
+        (
+            q
+            for q, next_q in zip(quarter_data, quarter_data[1:] + [{'date': datetime.max}])
+            if q['date'] <= report_date < next_q['date']
+        ),
+        quarter_data[-1] if quarter_data[-1]['date'] <= report_date else quarter_data[0]
+    )
     
-    # If report_date is after all quarters, use last index
-    if report_idx is None:
-        report_idx = len(quarter_data)
+    # Split quarters into before, at, and after report_quarter
+    quarters_before = [q for q in quarter_data if q['date'] < report_quarter['date']]
+    quarters_after = [q for q in quarter_data if q['date'] > report_quarter['date']]
     
     if type == 'forward':
-        # Q[1:5] - Next 4 quarters after report_date (indices 1-4 relative to report_date)
-        start_idx = report_idx + 1  # Skip first (index 1)
-        end_idx = start_idx + 4     # Take 4 quarters (indices 1-4)
-        
-        if end_idx <= len(quarter_data):
-            return sum(q['eps'] for q in quarter_data[start_idx:end_idx])
-        elif start_idx < len(quarter_data):
-            return sum(q['eps'] for q in quarter_data[start_idx:])
-        else:
-            return None
+        # Q(0)+Q(1)+Q(2)+Q(3) - Report date quarter and next 3 quarters
+        selected = [report_quarter] + quarters_after[:3]
+    elif type == 'trailing':
+        # Q(-4)+Q(-3)+Q(-2)+Q(-1) - Last 4 quarters before report date
+        selected = quarters_before[-4:]
+    else:
+        return None
     
-    elif type == 'mix':
-        # Q[0:4] - Report date and next 3 quarters (indices 0-3 relative to report_date)
-        start_idx = report_idx      # Include report_date quarter (index 0)
-        end_idx = start_idx + 4     # Take 4 quarters total (indices 0-3)
-        
-        if end_idx <= len(quarter_data):
-            return sum(q['eps'] for q in quarter_data[start_idx:end_idx])
-        elif start_idx < len(quarter_data):
-            return sum(q['eps'] for q in quarter_data[start_idx:])
-        else:
-            return None
-    
-    elif type == 'trailing-like':
-        # Q[-3:1] - Last 3 quarters before and report date (indices -3 to 0 relative to report_date)
-        start_idx = max(0, report_idx - 3)  # Start 3 quarters before report_date
-        end_idx = report_idx + 1            # Include report_date quarter (index 0)
-        
-        if start_idx < len(quarter_data) and end_idx <= len(quarter_data):
-            return sum(q['eps'] for q in quarter_data[start_idx:end_idx])
-        elif start_idx < len(quarter_data):
-            return sum(q['eps'] for q in quarter_data[start_idx:])
-        else:
-            return None
-    
-    return None
+    return sum(q['eps'] for q in selected) if len(selected) == 4 else None
 
 
-def calculate_pe_ratio(
-    type: Literal['forward', 'mix', 'trailing-like'] = 'forward'
+def fetch_sp500_pe_ratio(
+    type: PE_RATIO_TYPE = 'forward'
 ) -> pd.DataFrame:
-    """Calculate P/E ratios from EPS estimates using S&P 500 prices.
+    """Fetch P/E ratios from EPS estimates using S&P 500 prices.
     
     Calculates Price-to-Earnings (P/E) ratios using 4-quarter EPS sums and S&P 500 stock prices.
     EPS is calculated as the sum of 4 quarters based on the type:
-    - forward: Q[1:5] - Next 4 quarters after report date (skip first, take next 4)
-    - mix: Q[0:4] - Report date and next 3 quarters (include report date, take next 3)
-    - trailing-like: Q[-3:1] - Last 3 quarters before and report date (take 3 before, include report date)
+    - forward: Q(0)+Q(1)+Q(2)+Q(3) - Report date quarter and next 3 quarters
+    - trailing: Q(-4)+Q(-3)+Q(-2)+Q(-1) - Last 4 quarters before report date
     
     Args:
         type: Type of P/E ratio to calculate:
-            - 'forward': Q[1:5] - Next 4 quarters after report date (skip first, take next 4)
-            - 'mix': Q[0:4] - Report date and next 3 quarters (include report date, take next 3)
-            - 'trailing-like': Q[-3:1] - Last 3 quarters before and report date (take 3 before, include report date)
+            - 'forward': Q(0)+Q(1)+Q(2)+Q(3) - Report date quarter and next 3 quarters
+            - 'trailing': Q(-4)+Q(-3)+Q(-2)+Q(-1) - Last 4 quarters before report date
         
     Returns:
         DataFrame with P/E ratios:
@@ -229,26 +205,220 @@ def calculate_pe_ratio(
         if eps_candidates.empty:
             continue
         
-        eps_row = eps_candidates.iloc[-1]
-        report_date = eps_row['Report_Date']
+        # Try reports from most recent to oldest until we find one with exactly 4 quarters
+        # Use price_date (current date) as the reference point for quarter calculation
+        eps_sum = None
+        report_date = None
+        for _, eps_row in reversed(list(eps_candidates.iterrows())):
+            report_date = eps_row['Report_Date']
+            # Use price_date instead of report_date for quarter calculation
+            eps_sum = _get_quarter_eps_sum(eps_row, quarter_cols, price_date, type)
+            # _get_quarter_eps_sum already checks for exactly 4 quarters
+            if eps_sum and eps_sum > 0:
+                break
         
-        # Calculate 4-quarter EPS sum based on type (use report_date for EPS calculation)
-        eps_sum = _get_quarter_eps_sum(eps_row, quarter_cols, report_date, type)
+        if not eps_sum or eps_sum <= 0:
+            continue
         
-        if eps_sum and eps_sum > 0:
-            pe_ratio = price / eps_sum
-            results.append({
-                'Report_Date': report_date.strftime('%Y-%m-%d'),
-                'Price_Date': price_date.strftime('%Y-%m-%d'),
-                'Price': price,
-                'EPS_4Q_Sum': eps_sum,
-                'PE_Ratio': pe_ratio,
-                'Type': type
-            })
+        pe_ratio = price / eps_sum
+        results.append({
+            'Report_Date': report_date.strftime('%Y-%m-%d'),
+            'Price_Date': price_date.strftime('%Y-%m-%d'),
+            'Price': price,
+            'EPS_4Q_Sum': eps_sum,
+            'PE_Ratio': pe_ratio,
+            'Type': type
+        })
     
     if not results:
         return pd.DataFrame(columns=['Report_Date', 'Price_Date', 'Price', 'EPS_4Q_Sum', 'PE_Ratio', 'Type'])
     
     df_result = pd.DataFrame(results)
     return df_result
+
+
+def plot_pe_ratio_with_price(
+    output_path: Path | None = None,
+    std_threshold: float = 1.5,
+    figsize: tuple[int, int] = (14, 12)
+) -> None:
+    """Plot S&P 500 Price with P/E Ratios, highlighting periods outside ±1.5σ range.
+    
+    Creates two subplots showing S&P 500 Price alongside different P/E ratio types:
+    - Q(-4)+Q(-3)+Q(-2)+Q(-1) (trailing): Last 4 quarters before report date
+    - Q(0)+Q(1)+Q(2)+Q(3) (forward): Report date quarter and next 3 quarters
+    
+    Each subplot highlights periods where P/E ratio is outside ±1.5σ range:
+    - Red bands: P/E > +1.5σ (overvalued periods)
+    - Blue bands: P/E < -1.5σ (undervalued periods)
+    
+    Args:
+        output_path: Path to save the plot. If None, displays the plot.
+        std_threshold: Standard deviation threshold (default: 1.5)
+        figsize: Figure size tuple (width, height) in inches (default: (14, 12))
+    """
+    # Fetch data for both types
+    types = ['trailing', 'forward']
+    type_labels = {
+        'trailing': 'Q(-4)+Q(-3)+Q(-2)+Q(-1)',
+        'forward': 'Q(0)+Q(1)+Q(2)+Q(3)'
+    }
+    type_colors = {
+        'trailing': 'green',
+        'forward': 'red'
+    }
+    
+    data_dict = {}
+    for pe_type in types:
+        df = fetch_sp500_pe_ratio(type=pe_type)
+        if not df.empty:
+            df['Price_Date'] = pd.to_datetime(df['Price_Date'])
+            df = df.sort_values('Price_Date')
+            data_dict[pe_type] = df
+    
+    if not data_dict:
+        raise ValueError("No P/E ratio data available. Please ensure EPS data is available.")
+    
+    # Create figure with 2 subplots
+    fig, axes = plt.subplots(2, 1, figsize=figsize, sharex=True)
+    today_str = datetime.now().strftime('%Y-%m-%d')
+    fig.suptitle(
+        f'S&P 500 Price with P/E Ratios (Last Updated: {today_str})',
+        fontsize=16,
+        fontweight='bold',
+        y=0.995
+    )
+    
+    for idx, pe_type in enumerate(types):
+        if pe_type not in data_dict:
+            continue
+            
+        ax = axes[idx]
+        df = data_dict[pe_type]
+        
+        # Convert dates to numpy array for easier manipulation
+        dates = pd.to_datetime(df['Price_Date']).values
+        prices = df['Price'].values
+        pe_ratios = df['PE_Ratio'].values
+        
+        # Use original data without any clipping or smoothing
+        # Calculate statistics on original data
+        pe_mean = np.mean(pe_ratios)
+        pe_std = np.std(pe_ratios)
+        upper_threshold = pe_mean + std_threshold * pe_std
+        lower_threshold = pe_mean - std_threshold * pe_std
+        
+        # Create secondary y-axis for P/E ratio
+        ax2 = ax.twinx()
+        
+        # Highlight periods outside ±1.5σ range - use vertical bands across full y-axis
+        overvalued_mask = pe_ratios > upper_threshold
+        undervalued_mask = pe_ratios < lower_threshold
+        
+        # Find continuous regions for vertical bands
+        in_overvalued = False
+        in_undervalued = False
+        overvalued_start = None
+        undervalued_start = None
+        
+        for i in range(len(dates)):
+            if overvalued_mask[i]:
+                if not in_overvalued:
+                    overvalued_start = dates[i]
+                    in_overvalued = True
+            else:
+                if in_overvalued:
+                    ax.axvspan(overvalued_start, dates[i-1] if i > 0 else dates[0], 
+                              alpha=0.2, color='red', zorder=0)
+                    in_overvalued = False
+            
+            if undervalued_mask[i]:
+                if not in_undervalued:
+                    undervalued_start = dates[i]
+                    in_undervalued = True
+            else:
+                if in_undervalued:
+                    ax.axvspan(undervalued_start, dates[i-1] if i > 0 else dates[0], 
+                              alpha=0.2, color='blue', zorder=0)
+                    in_undervalued = False
+        
+        # Handle case where region extends to end
+        if in_overvalued:
+            ax.axvspan(overvalued_start, dates[-1], alpha=0.2, color='red', zorder=0)
+        if in_undervalued:
+            ax.axvspan(undervalued_start, dates[-1], alpha=0.2, color='blue', zorder=0)
+        
+        # Plot mean and threshold lines
+        ax2.axhline(y=pe_mean, color='gray', linestyle='--', linewidth=1.2, alpha=0.7, zorder=1)
+        ax2.axhline(y=upper_threshold, color='gold', linestyle=':', linewidth=1.2, alpha=0.7, zorder=1)
+        ax2.axhline(y=lower_threshold, color='gold', linestyle=':', linewidth=1.2, alpha=0.7, zorder=1)
+        
+        # Plot S&P 500 Price (left axis) - smoother line
+        ax.plot(dates, prices, 'k-', linewidth=1.8, label='S&P 500 Price', alpha=0.85, zorder=2)
+        ax.set_ylabel('S&P 500 Price', fontsize=11, fontweight='bold')
+        ax.tick_params(axis='y', labelsize=9)
+        ax.grid(True, alpha=0.15, linestyle='-', linewidth=0.3)
+        
+        # Plot P/E Ratio (right axis) - use original values
+        color = type_colors[pe_type]
+        ax2.plot(dates, pe_ratios, color=color, linewidth=1.5, 
+                label=f'{type_labels[pe_type]} P/E Ratio', alpha=0.7, zorder=3)
+        ax2.set_ylabel('P/E Ratio', fontsize=11, fontweight='bold', color=color)
+        ax2.tick_params(axis='y', labelsize=9, labelcolor=color)
+        ax2.margins(y=0.2)  # Add 20% margin to y-axis
+        
+        # Set title
+        ax.set_title(
+            f'S&P 500 Price with {type_labels[pe_type]} P/E Ratio (Highlighting periods outside ±{std_threshold}σ range)',
+            fontsize=12,
+            fontweight='bold',
+            pad=10
+        )
+        
+        # Format x-axis dates
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+        ax.xaxis.set_major_locator(mdates.YearLocator())
+        ax.xaxis.set_minor_locator(mdates.MonthLocator((1, 7)))
+        plt.setp(ax.xaxis.get_majorticklabels(), rotation=0, ha='center', fontsize=9)
+        
+        # Create cleaner legend
+        legend_elements = [
+            plt.Line2D([0], [0], color='black', linewidth=1.8, label='S&P 500 Price'),
+            plt.Line2D([0], [0], color=color, linewidth=1.0, label=f'{type_labels[pe_type]} P/E Ratio', alpha=0.6),
+            plt.Line2D([0], [0], color='gray', linestyle='--', linewidth=1.2, label=f'Mean: {pe_mean:.2f}'),
+            plt.Line2D([0], [0], color='gold', linestyle=':', linewidth=1.2, label=f'+{std_threshold}σ: {upper_threshold:.2f}'),
+            plt.Line2D([0], [0], color='gold', linestyle=':', linewidth=1.2, label=f'-{std_threshold}σ: {lower_threshold:.2f}'),
+            plt.Rectangle((0, 0), 1, 1, facecolor='red', alpha=0.2, label=f'P/E > +{std_threshold}σ'),
+            plt.Rectangle((0, 0), 1, 1, facecolor='blue', alpha=0.2, label=f'P/E < -{std_threshold}σ')
+        ]
+        
+        ax.legend(handles=legend_elements, loc='upper left', fontsize=8, 
+                 framealpha=0.9, edgecolor='lightgray')
+    
+    # Set x-axis label on bottom subplot
+    axes[-1].set_xlabel('Date', fontsize=11, fontweight='bold')
+    
+    # Add today's date at the bottom - make it highly visible
+    today_str = datetime.now().strftime('%Y-%m-%d')
+    axes[-1].text(0.99, -0.15, f'Last Updated: {today_str}', 
+                  transform=axes[-1].transAxes, 
+                  fontsize=14, 
+                  ha='right', 
+                  va='top',
+                  color='black',
+                  alpha=1.0,
+                  fontweight='bold',
+                  bbox=dict(boxstyle='round,pad=0.8', facecolor='white', edgecolor='black', linewidth=1.5, alpha=0.95))
+    
+    # Adjust layout
+    plt.tight_layout(rect=[0, 0, 1, 0.98])
+    
+    # Save or show
+    if output_path:
+        plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
+        print(f"✅ Plot saved to {output_path}")
+    else:
+        plt.show()
+    
+    plt.close()
 

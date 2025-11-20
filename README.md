@@ -16,6 +16,13 @@ Financial data providers (FactSet, Bloomberg, Investing.com, etc.) typically off
 
 To address this, this project extracts **point-in-time EPS estimates** from historical earnings insight reports. By preserving the estimates as they appeared at each report date (before actual earnings were announced), a dataset can be built that accurately reflects what was known and expected at each point in time, enabling more meaningful backtesting and predictive analysis.
 
+
+## Current P/E Ratio Analysis
+
+The following graph shows the current S&P 500 Price with Trailing and Forward P/E Ratios, highlighting periods outside ±1.5σ range.
+
+![P/E Ratio Analysis](https://pub-62707afd3ebb422aae744c63c49d36a0.r2.dev/pe_ratio_plot.png)
+
 ## Project Structure
 
 ```
@@ -42,7 +49,22 @@ eps-estimates-collector/
 
 ## Installation
 
-Install from PyPI:
+### Install uv (if not already installed)
+
+```bash
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Or with Homebrew
+brew install uv
+
+# Or with pip
+pip install uv
+```
+
+### Install the package
+
+**From PyPI:**
 
 ```bash
 pip install eps-estimates-collector
@@ -109,7 +131,7 @@ The complete workflow from PDF documents to final P/E ratio calculation:
 │  EPS Estimates + S&P 500 Prices                                     │
 │  ├─> Load EPS data from public URL                                  │
 │  ├─> Load S&P 500 prices from yfinance (2016-12-09 to today)        │
-│  ├─> Calculate 4-quarter EPS sum (forward: Q(1)+Q(2)+Q(3)+Q(4), etc.) │
+│  ├─> Calculate 4-quarter EPS sum (e.g. forward: Q(0)+Q(1)+Q(2)+Q(3))│
 │  └─> Calculate P/E Ratio = Price / EPS_4Q_Sum                       │
 │                                                                     │
 │  Output: DataFrame with P/E ratios                                  │
@@ -122,11 +144,12 @@ The complete workflow from PDF documents to final P/E ratio calculation:
 
 <table>
 <tr>
-<td width="50%">
+<td width="50%" style="vertical-align: top;">
 <strong>Step 2: EPS Chart Page Extraction</strong><br>
 <img src="output/preprocessing_test/20161209-6_original.png" alt="Original Chart" width="100%">
+<small><em></em></small>
 </td>
-<td width="50%">
+<td width="50%" style="vertical-align: top;">
 <strong>Step 3: OCR Processing & Bar Classification</strong><br>
 <img src="output/preprocessing_test/20161209-6_bar_classification.png" alt="Bar Classification" width="100%">
 <small><em>Red bars = Actual values, Magenta bars = Estimates</em></small>
@@ -139,10 +162,10 @@ The complete workflow from PDF documents to final P/E ratio calculation:
 ### Example: P/E Ratio Calculation Result
 
 ```python
-from eps_estimates_collector import calculate_pe_ratio
+from eps_estimates_collector import fetch_sp500_pe_ratio
 
-# Calculate trailing-like P/E ratios
-pe_df = calculate_pe_ratio('trailing-like')
+# Fetch trailing P/E ratios
+pe_df = fetch_sp500_pe_ratio(type='trailing')
 print(pe_df)
 ```
 
@@ -150,15 +173,18 @@ print(pe_df)
 ```
 📈 Loading S&P 500 price data from yfinance (2016-12-09 to 2025-11-20)...
 ✅ Loaded 2249 S&P 500 price points
-
-      Report_Date  Price_Date    Price  EPS_4Q_Sum  PE_Ratio         Type
-0      2016-12-09  2016-12-09  2249.69      122.28     18.40  trailing-like
-1      2016-12-09  2016-12-12  2257.48      122.28     18.46  trailing-like
-2      2016-12-09  2016-12-13  2271.72      122.28     18.58  trailing-like
-...
-2246   2025-11-07  2025-11-13  6600.00      278.30     23.72  trailing-like
-2247   2025-11-14  2025-11-14  6700.00      278.84     24.03  trailing-like
-2248   2025-11-14  2025-11-19  6700.00      278.84     24.03  trailing-like
+     Report_Date  Price_Date        Price  EPS_4Q_Sum   PE_Ratio      Type
+0     2016-12-09  2016-12-09  2259.530029      122.28  18.478329  trailing
+1     2016-12-09  2016-12-12  2256.959961      122.28  18.457311  trailing
+2     2016-12-09  2016-12-13  2271.719971      122.28  18.578017  trailing
+3     2016-12-09  2016-12-14  2253.280029      122.28  18.427216  trailing
+4     2016-12-09  2016-12-15  2262.030029      122.28  18.498774  trailing
+...          ...         ...          ...         ...        ...       ...
+2244  2025-11-07  2025-11-13  6737.490234      278.30  24.209451  trailing
+2245  2025-11-14  2025-11-14  6734.109863      278.84  24.150444  trailing
+2246  2025-11-14  2025-11-17  6672.410156      278.84  23.929171  trailing
+2247  2025-11-14  2025-11-18  6617.319824      278.84  23.731602  trailing
+2248  2025-11-14  2025-11-19  6642.160156      278.84  23.820686  trailing
 
 [2249 rows x 6 columns]
 ```
@@ -168,17 +194,16 @@ print(pe_df)
 ### Python API
 
 ```python
-from eps_estimates_collector import calculate_pe_ratio
+from eps_estimates_collector import fetch_sp500_pe_ratio
 
-# Calculate P/E ratios (auto-loads CSV and S&P 500 prices)
-pe_df = calculate_pe_ratio(type='forward')
+# Fetch P/E ratios (auto-loads CSV and S&P 500 prices)
+pe_df = fetch_sp500_pe_ratio(type='forward')
 print(pe_df)
 ```
 
 **P/E Types:**
-- `forward`: Q(1) + Q(2) + Q(3) + Q(4) - Next 4 quarters after report date (skips current quarter)
-- `mix`: Q(0) + Q(1) + Q(2) + Q(3) - Current quarter + next 3 quarters
-- `trailing-like`: Q(-3) + Q(-2) + Q(-1) + Q(0) - Last 3 quarters before + current quarter (note: current quarter is an estimate, so this is not exact TTM)
+- `forward`: Q(0) + Q(1) + Q(2) + Q(3) - Report date quarter and next 3 quarters
+- `trailing`: Q(-4) + Q(-3) + Q(-2) + Q(-1) - Last 4 quarters before report date
 
 ## Architecture
 
@@ -206,9 +231,9 @@ print(pe_df)
 │  Python Script                                                   │
 ├──────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  from eps_estimates_collector import calculate_pe_ratio          │
+│  from eps_estimates_collector import fetch_sp500_pe_ratio        │
 │                                                                  │
-│  pe_df = calculate_pe_ratio(type='forward')                      │
+│  pe_df = fetch_sp500_pe_ratio(type='forward')                    │
 │     │                                                            │
 │     ├─ read_csv_from_cloud("extracted_estimates.csv")            │
 │     │      │                                                     │
@@ -306,15 +331,14 @@ Same structure, contains OCR confidence scores (0-1).
 
 ## API Reference
 
-### `calculate_pe_ratio(type='forward')`
+### `fetch_sp500_pe_ratio(type='forward')`
 
-Calculate P/E ratios from EPS estimates using S&P 500 prices.
+Fetch P/E ratios from EPS estimates using S&P 500 prices.
 
 **Parameters:**
-- `type` (str): `'forward'`, `'mix'`, or `'trailing-like'`
-  - `'forward'`: Q(1) + Q(2) + Q(3) + Q(4) - Next 4 quarters after report date (skips current quarter)
-  - `'mix'`: Q(0) + Q(1) + Q(2) + Q(3) - Report date quarter + next 3 quarters
-  - `'trailing-like'`: Q(-3) + Q(-2) + Q(-1) + Q(0) - Last 3 quarters before report date + report date quarter (note: report date quarter is an estimate, so this is not exact TTM)
+- `type` (str): `'forward'` or `'trailing'`
+  - `'forward'`: Q(0) + Q(1) + Q(2) + Q(3) - Report date quarter and next 3 quarters
+  - `'trailing'`: Q(-4) + Q(-3) + Q(-2) + Q(-1) - Last 4 quarters before report date
 
 **Returns:** DataFrame with columns:
 - `Report_Date`: EPS report date
@@ -326,10 +350,10 @@ Calculate P/E ratios from EPS estimates using S&P 500 prices.
 
 **Example:**
 ```python
-from eps_estimates_collector import calculate_pe_ratio
+from eps_estimates_collector import fetch_sp500_pe_ratio
 
 # Auto-loads CSV from public URL and S&P 500 prices from yfinance
-pe_df = calculate_pe_ratio(type='forward')
+pe_df = fetch_sp500_pe_ratio(type='forward')
 print(pe_df)
 ```
 
@@ -359,7 +383,35 @@ R2_SECRET_ACCESS_KEY
 
 ## Recent Updates
 
-### v0.3.0 (2025-11-19) - Cloud-First Architecture
+### v0.3.0 (2025-11-20) - P/E Ratio API & Calculation Improvements
+- ✅ **API Rename**: `calculate_pe_ratio()` → `fetch_sp500_pe_ratio()` - clearer naming for S&P 500 specific function
+- ✅ **P/E Type Simplification**: Only `forward` and `trailing` types supported (removed `mix` and `trailing-like`)
+  - `forward`: Q(0)+Q(1)+Q(2)+Q(3) - Report date quarter and next 3 quarters
+  - `trailing`: Q(-4)+Q(-3)+Q(-2)+Q(-1) - Last 4 quarters before report date
+- ✅ **Quarter Calculation Fix**: Now uses `price_date` instead of `report_date` for quarter determination - ensures accurate quarter matching based on current date
+- ✅ **P/E Ratio Graph Generation**: Automated graph creation and upload to public bucket via workflow
+
+### v0.2.5 (2025-11-20) - README Improvements
+- ✅ Added PyPI-specific README (`README_PYPI.md`)
+- ✅ Clarified Q[1:5] notation to Q(1)+Q(2)+Q(3)+Q(4) format
+- ✅ Updated P/E ratio types: forward (Q(0)+Q(1)+Q(2)+Q(3)) and trailing (Q(-4)+Q(-3)+Q(-2)+Q(-1))
+- ✅ Added Visual Workflow images (GitHub README)
+- ✅ Added GitHub links (`project.urls`)
+
+### v0.2.4 (2025-11-20) - Import Path Fix
+- ✅ Changed to relative imports (`src.eps_estimates_collector` → `...utils`)
+- ✅ Fixed import errors after package installation
+
+### v0.2.3 (2025-11-20) - P/E Ratio Calculation Fix
+- ✅ Changed `end_date` to today's date (was: max report date)
+
+### v0.2.2 (2025-11-20) - Import Path Fix
+- ✅ Changed to relative imports for proper package installation
+
+### v0.2.1 (2025-11-20) - Dependency Compatibility
+- ✅ Relaxed Pillow version requirement (`pillow>=12.0.0` → `pillow>=8.0.0`) - improved gradio compatibility
+
+### v0.2.0 (2025-11-19) - Cloud-First Architecture
 - ✅ **Cloud-first design**: CSV data always from public URL
 - ✅ **Two-bucket strategy**: Private (PDF/PNG) + Public (CSV)
 - ✅ **Simplified codebase**: Removed local file logic

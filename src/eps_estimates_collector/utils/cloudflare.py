@@ -167,6 +167,52 @@ def file_exists_in_cloud(cloud_path: str) -> bool:
         return False
 
 
+def upload_file_to_public_cloud(file_path: Path, cloud_path: str) -> bool:
+    """Upload file to public bucket (requires auth).
+    
+    Args:
+        file_path: Local file path
+        cloud_path: Cloud storage path
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    if not PUBLIC_BUCKET_ENABLED or not boto3 or not Config:
+        return False
+    
+    if not file_path.exists():
+        return False
+    
+    try:
+        s3_client = boto3.client(
+            's3',
+            endpoint_url=f'https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com',
+            aws_access_key_id=R2_ACCESS_KEY_ID,
+            aws_secret_access_key=R2_SECRET_ACCESS_KEY,
+            config=Config(signature_version='s3v4')
+        )
+        
+        # Determine content type based on file extension
+        content_type = 'application/octet-stream'
+        if file_path.suffix.lower() == '.png':
+            content_type = 'image/png'
+        elif file_path.suffix.lower() == '.jpg' or file_path.suffix.lower() == '.jpeg':
+            content_type = 'image/jpeg'
+        elif file_path.suffix.lower() == '.csv':
+            content_type = 'text/csv'
+        
+        s3_client.upload_file(
+            str(file_path),
+            R2_PUBLIC_BUCKET_NAME,
+            cloud_path,
+            ExtraArgs={'ContentType': content_type}
+        )
+        return True
+    except Exception as e:
+        print(f"Error uploading file to public cloud: {e}")
+        return False
+
+
 def list_cloud_files(prefix: str = '') -> list[str]:
     """List files in Cloudflare R2 bucket with given prefix.
     

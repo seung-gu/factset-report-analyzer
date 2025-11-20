@@ -72,7 +72,7 @@ The complete workflow from PDF documents to final P/E ratio calculation:
 │  EPS Estimates + S&P 500 Prices                                     │
 │  ├─> Load EPS data from public URL                                  │
 │  ├─> Load S&P 500 prices from yfinance (2016-12-09 to today)        │
-│  ├─> Calculate 4-quarter EPS sum (e.g. forward: Q(1)+Q(2)+Q(3)+Q(4))│
+│  ├─> Calculate 4-quarter EPS sum (e.g. forward: Q(0)+Q(1)+Q(2)+Q(3))│
 │  └─> Calculate P/E Ratio = Price / EPS_4Q_Sum                       │
 │                                                                     │
 │  Output: DataFrame with P/E ratios                                  │
@@ -94,25 +94,24 @@ The complete workflow from PDF documents to final P/E ratio calculation:
 ### Python API
 
 ```python
-from eps_estimates_collector import calculate_pe_ratio
+from eps_estimates_collector import fetch_sp500_pe_ratio
 
-# Calculate P/E ratios (auto-loads CSV and S&P 500 prices)
-pe_df = calculate_pe_ratio(type='forward')
+# Fetch P/E ratios (auto-loads CSV and S&P 500 prices)
+pe_df = fetch_sp500_pe_ratio(type='forward')
 print(pe_df)
 ```
 
 **P/E Types:**
-- `forward`: Q(1) + Q(2) + Q(3) + Q(4) - Next 4 quarters after report date (skips current quarter)
-- `mix`: Q(0) + Q(1) + Q(2) + Q(3) - Current quarter + next 3 quarters
-- `trailing-like`: Q(-3) + Q(-2) + Q(-1) + Q(0) - Last 3 quarters before + current quarter (note: current quarter is an estimate, so this is not exact TTM)
+- `forward`: Q(0) + Q(1) + Q(2) + Q(3) - Report date quarter and next 3 quarters
+- `trailing`: Q(-4) + Q(-3) + Q(-2) + Q(-1) - Last 4 quarters before report date
 
 ### Example: P/E Ratio Calculation Result
 
 ```python
-from eps_estimates_collector import calculate_pe_ratio
+from eps_estimates_collector import fetch_sp500_pe_ratio
 
-# Calculate trailing-like P/E ratios
-pe_df = calculate_pe_ratio('trailing-like')
+# Fetch trailing P/E ratios
+pe_df = fetch_sp500_pe_ratio(type='trailing')
 print(pe_df)
 ```
 
@@ -120,30 +119,32 @@ print(pe_df)
 ```
 📈 Loading S&P 500 price data from yfinance (2016-12-09 to 2025-11-20)...
 ✅ Loaded 2249 S&P 500 price points
-
-      Report_Date  Price_Date    Price  EPS_4Q_Sum  PE_Ratio         Type
-0      2016-12-09  2016-12-09  2249.69      122.28     18.40  trailing-like
-1      2016-12-09  2016-12-12  2257.48      122.28     18.46  trailing-like
-2      2016-12-09  2016-12-13  2271.72      122.28     18.58  trailing-like
-...
-2246   2025-11-07  2025-11-13  6600.00      278.30     23.72  trailing-like
-2247   2025-11-14  2025-11-14  6700.00      278.84     24.03  trailing-like
-2248   2025-11-14  2025-11-19  6700.00      278.84     24.03  trailing-like
+     Report_Date  Price_Date        Price  EPS_4Q_Sum   PE_Ratio      Type
+0     2016-12-09  2016-12-09  2259.530029      122.28  18.478329  trailing
+1     2016-12-09  2016-12-12  2256.959961      122.28  18.457311  trailing
+2     2016-12-09  2016-12-13  2271.719971      122.28  18.578017  trailing
+3     2016-12-09  2016-12-14  2253.280029      122.28  18.427216  trailing
+4     2016-12-09  2016-12-15  2262.030029      122.28  18.498774  trailing
+...          ...         ...          ...         ...        ...       ...
+2244  2025-11-07  2025-11-13  6737.490234      278.30  24.209451  trailing
+2245  2025-11-14  2025-11-14  6734.109863      278.84  24.150444  trailing
+2246  2025-11-14  2025-11-17  6672.410156      278.84  23.929171  trailing
+2247  2025-11-14  2025-11-18  6617.319824      278.84  23.731602  trailing
+2248  2025-11-14  2025-11-19  6642.160156      278.84  23.820686  trailing
 
 [2249 rows x 6 columns]
 ```
 
 ### API Reference
 
-#### `calculate_pe_ratio(type='forward')`
+#### `fetch_sp500_pe_ratio(type='forward')`
 
-Calculate P/E ratios from EPS estimates using S&P 500 prices.
+Fetch P/E ratios from EPS estimates using S&P 500 prices.
 
 **Parameters:**
-- `type` (str): `'forward'`, `'mix'`, or `'trailing-like'`
-  - `'forward'`: Q(1) + Q(2) + Q(3) + Q(4) - Next 4 quarters after report date (skips current quarter)
-  - `'mix'`: Q(0) + Q(1) + Q(2) + Q(3) - Report date quarter + next 3 quarters
-  - `'trailing-like'`: Q(-3) + Q(-2) + Q(-1) + Q(0) - Last 3 quarters before report date + report date quarter (note: report date quarter is an estimate, so this is not exact TTM)
+- `type` (str): `'forward'` or `'trailing'`
+  - `'forward'`: Q(0) + Q(1) + Q(2) + Q(3) - Report date quarter and next 3 quarters
+  - `'trailing'`: Q(-4) + Q(-3) + Q(-2) + Q(-1) - Last 4 quarters before report date
 
 **Returns:** DataFrame with columns:
 - `Report_Date`: EPS report date

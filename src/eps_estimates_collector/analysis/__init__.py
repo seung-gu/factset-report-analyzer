@@ -1,8 +1,8 @@
 """Analysis functionality for EPS data."""
 
-from .pe_ratio import calculate_pe_ratio
+from .pe_ratio import fetch_sp500_pe_ratio
 
 __all__ = [
-    'calculate_pe_ratio',
+    'fetch_sp500_pe_ratio',
 ]
 
