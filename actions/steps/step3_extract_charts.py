@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from src.eps_estimates_collector import extract_charts
+from src.factset_report_analyzer import extract_charts
 
 
 def extract_chart_pages(pdf_files: list[Path]) -> list[tuple[str, bytes]]:

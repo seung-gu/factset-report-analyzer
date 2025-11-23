@@ -8,8 +8,8 @@ import json
 import tempfile
 from pathlib import Path
 
-from src.eps_estimates_collector.analysis.pe_ratio import plot_pe_ratio_with_price
-from src.eps_estimates_collector.utils.cloudflare import upload_file_to_public_cloud
+from src.factset_report_analyzer.analysis.sp500 import plot_pe_ratio_with_price
+from src.factset_report_analyzer.utils.cloudflare import upload_file_to_public_cloud
 
 
 def generate_pe_ratio_plot() -> None:
@@ -39,7 +39,7 @@ def _purge_camo_cache() -> None:
     """Purge Camo cache to force GitHub to show updated image."""
     try:
         time.sleep(10)  # Wait for GitHub to render README
-        repo = os.getenv('GITHUB_REPOSITORY', 'seung-gu/eps-estimates-collector')
+        repo = os.getenv('GITHUB_REPOSITORY', 'seung-gu/factset-report-analyzer')
         req = urllib.request.Request(
             f"https://api.github.com/repos/{repo}/readme",
             headers={"Accept": "application/vnd.github.html"}

@@ -1,7 +1,7 @@
 [project]
-name = "eps-estimates-collector"
-version = "0.3.2"
-description = "Extract quarterly EPS estimates from FactSet Earnings Insight reports using OCR"
+name = "factset-report-analyzer"
+version = "0.4.0"
+description = "Extract quarterly EPS estimates from FactSet Earnings Insight reports using OCR and calculate S&P 500 P/E ratios"
 readme = "README_PYPI.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
@@ -34,15 +34,15 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/seung-gu/eps-estimates-collector"
-Repository = "https://github.com/seung-gu/eps-estimates-collector"
-Issues = "https://github.com/seung-gu/eps-estimates-collector/issues"
+Homepage = "https://github.com/seung-gu/factset-report-analyzer"
+Repository = "https://github.com/seung-gu/factset-report-analyzer"
+Issues = "https://github.com/seung-gu/factset-report-analyzer/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=7.4.0", "pytest-cov>=4.1.0"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/eps_estimates_collector"]
+packages = ["src/factset_report_analyzer"]
 
 [build-system]
 requires = ["hatchling"]

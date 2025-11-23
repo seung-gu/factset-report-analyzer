@@ -3,7 +3,7 @@ CLI wrapper for extracting EPS charts from FactSet PDFs.
 
 This script provides a command-line interface to extract chart pages from PDFs.
 For programmatic use, import from the main package:
-    from eps_estimates_collector import extract_charts
+    from factset_report_analyzer import extract_charts
 """
 import sys
 from pathlib import Path
@@ -12,7 +12,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.eps_estimates_collector import extract_charts
+from src.factset_report_analyzer import extract_charts
 
 
 def main() -> None:

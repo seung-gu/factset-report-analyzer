@@ -1,15 +1,15 @@
-# EPS Estimates Collector
+# FactSet Report Analyzer
 
-[![Weekly Update](https://github.com/seung-gu/eps-estimates-collector/actions/workflows/data-collection.yml/badge.svg)](https://github.com/seung-gu/eps-estimates-collector/actions/workflows/data-collection.yml)
-[![PyPI version](https://img.shields.io/pypi/v/eps-estimates-collector.svg)](https://pypi.org/project/eps-estimates-collector/)
-[![Python 3.11+](https://img.shields.io/pypi/pyversions/eps-estimates-collector.svg)](https://pypi.org/project/eps-estimates-collector/)
-[![License: MIT](https://img.shields.io/pypi/l/eps-estimates-collector.svg)](https://github.com/seung-gu/eps-estimates-collector/blob/main/LICENSE)
+[![Weekly Update](https://github.com/seung-gu/factset-report-analyzer/actions/workflows/data-collection.yml/badge.svg)](https://github.com/seung-gu/factset-report-analyzer/actions/workflows/data-collection.yml)
+[![PyPI version](https://img.shields.io/pypi/v/factset-report-analyzer.svg)](https://pypi.org/project/factset-report-analyzer/)
+[![Python 3.11+](https://img.shields.io/pypi/pyversions/factset-report-analyzer.svg)](https://pypi.org/project/factset-report-analyzer/)
+[![License: MIT](https://img.shields.io/pypi/l/factset-report-analyzer.svg)](https://github.com/seung-gu/factset-report-analyzer/blob/main/LICENSE)
 
-A Python package for extracting quarterly EPS (Earnings Per Share) estimates from financial reports using OCR and image processing techniques.
+A Python package for extracting quarterly EPS (Earnings Per Share) estimates from FactSet financial reports using OCR and image processing techniques.
 
-**📦 PyPI**: [eps-estimates-collector](https://pypi.org/project/eps-estimates-collector/) 
+**📦 PyPI**: [factset-report-analyzer](https://pypi.org/project/factset-report-analyzer/) 
 
-**🐙 GitHub**: [seung-gu/eps-estimates-collector](https://github.com/seung-gu/eps-estimates-collector)
+**🐙 GitHub**: [seung-gu/factset-report-analyzer](https://github.com/seung-gu/factset-report-analyzer)
 
 > **⚠️ Disclaimer**: This package is for **educational and research purposes only**. For production use, please use [FactSet's official API](https://developer.factset.com/). This package processes publicly available PDF reports and is not affiliated with or endorsed by FactSet.
 
@@ -24,7 +24,7 @@ Financial data providers (FactSet, Bloomberg, Investing.com, etc.) typically off
 To address this, this project extracts **point-in-time EPS estimates** from historical earnings insight reports. By preserving the estimates as they appeared at each report date (before actual earnings were announced), a dataset can be built that accurately reflects what was known and expected at each point in time, enabling more meaningful backtesting and predictive analysis.
 
 
-## P/E Ratio Analysis ([🔄 Weekly Update](https://github.com/seung-gu/eps-estimates-collector/actions/workflows/data-collection.yml) every Monday)
+## P/E Ratio Analysis ([🔄 Weekly Update](https://github.com/seung-gu/factset-report-analyzer/actions/workflows/data-collection.yml) every Monday)
 
 The following graph shows the current S&P 500 Price with Trailing and Forward P/E Ratios, highlighting periods outside ±1.5σ range.
 
@@ -33,8 +33,8 @@ The following graph shows the current S&P 500 Price with Trailing and Forward P/
 ## Project Structure
 
 ```
-eps-estimates-collector/
-├── src/eps_estimates_collector/
+factset-report-analyzer/
+├── src/factset_report_analyzer/
 │   ├── core/                        # Data collection
 │   │   ├── downloader.py            # PDF download
 │   │   ├── extractor.py             # Chart extraction
@@ -45,7 +45,7 @@ eps-estimates-collector/
 │   │       ├── bar_classifier.py
 │   │       └── coordinate_matcher.py
 │   ├── analysis/                    # P/E ratio calculation
-│   │   └── pe_ratio.py
+│   │   └── sp500.py
 │   └── utils/                       # Cloud storage
 │       ├── cloudflare.py            # R2 operations
 │       └── csv_storage.py           # CSV I/O
@@ -74,13 +74,13 @@ pip install uv
 **From PyPI:**
 
 ```bash
-pip install eps-estimates-collector
+pip install factset-report-analyzer
 ```
 
 Or with `uv`:
 
 ```bash
-uv pip install eps-estimates-collector
+uv pip install factset-report-analyzer
 ```
 
 ### Requirements
@@ -172,10 +172,14 @@ The complete workflow from PDF documents to final P/E ratio calculation:
 ### Example: P/E Ratio Calculation Result
 
 ```python
-from eps_estimates_collector import fetch_sp500_pe_ratio
+from factset_report_analyzer import SP500
 
-# Fetch trailing P/E ratios
-pe_df = fetch_sp500_pe_ratio(type='trailing')
+# Initialize SP500 class
+sp500 = SP500()
+
+# Get trailing P/E ratios
+sp500.set_type('trailing')
+pe_df = sp500.pe_ratio
 print(pe_df)
 ```
 
@@ -204,11 +208,23 @@ print(pe_df)
 ### Python API
 
 ```python
-from eps_estimates_collector import fetch_sp500_pe_ratio
+from factset_report_analyzer import SP500
 
-# Fetch P/E ratios (auto-loads CSV and S&P 500 prices)
-pe_df = fetch_sp500_pe_ratio(type='forward')
+# Initialize SP500 class (auto-loads CSV and S&P 500 prices)
+sp500 = SP500()
+
+# Get P/E ratio DataFrame (default: forward type)
+pe_df = sp500.pe_ratio
 print(pe_df)
+
+# Switch to trailing type
+sp500.set_type('trailing')
+pe_trailing = sp500.pe_ratio
+print(pe_trailing)
+
+# Get current P/E ratio
+current = sp500.current_pe
+print(f"Current P/E: {current['pe_ratio']:.2f} on {current['date']}")
 ```
 
 **P/E Types:**
@@ -241,9 +257,10 @@ print(pe_df)
 │  Python Script                                                   │
 ├──────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  from eps_estimates_collector import fetch_sp500_pe_ratio        │
+│  from factset_report_analyzer import SP500                       │
 │                                                                  │
-│  pe_df = fetch_sp500_pe_ratio(type='forward')                    │
+│  sp500 = SP500()                                                 │
+│  pe_df = sp500.pe_ratio                                          │
 │     │                                                            │
 │     ├─ read_csv_from_cloud("extracted_estimates.csv")            │
 │     │      │                                                     │
@@ -341,30 +358,42 @@ Same structure, contains OCR confidence scores (0-1).
 
 ## API Reference
 
-### `fetch_sp500_pe_ratio(type='forward')`
+### `SP500` Class
 
-Fetch P/E ratios from EPS estimates using S&P 500 prices.
+S&P 500 Market Data with EPS and P/E ratio calculations.
 
-**Parameters:**
-- `type` (str): `'forward'` or `'trailing'`
-  - `'forward'`: Q(0) + Q(1) + Q(2) + Q(3) - Report date quarter and next 3 quarters
-  - `'trailing'`: Q(-4) + Q(-3) + Q(-2) + Q(-1) - Last 4 quarters before report date
+**Initialization:**
+```python
+from factset_report_analyzer import SP500
+sp500 = SP500()
+```
 
-**Returns:** DataFrame with columns:
-- `Report_Date`: EPS report date
-- `Price_Date`: Trading day price date
-- `Price`: S&P 500 closing price
-- `EPS_4Q_Sum`: 4-quarter EPS sum
-- `PE_Ratio`: Calculated P/E ratio
-- `Type`: P/E type used
+**Properties:**
+- `sp500.price`: DataFrame with S&P 500 price data (Date, Price)
+- `sp500.eps`: DataFrame with EPS data (Date, EPS) - depends on current type
+- `sp500.pe_ratio`: DataFrame with P/E ratio data (Date, Price, EPS, PE_Ratio) - depends on current type
+- `sp500.current_pe`: Dictionary with latest P/E ratio info (`{'date': ..., 'pe_ratio': ...}`)
+
+**Methods:**
+- `sp500.set_type(type)`: Set P/E type to `'forward'` or `'trailing'`
+
+**P/E Types:**
+- `'forward'`: Q(0) + Q(1) + Q(2) + Q(3) - Report date quarter and next 3 quarters
+- `'trailing'`: Q(-4) + Q(-3) + Q(-2) + Q(-1) - Last 4 quarters before report date
 
 **Example:**
 ```python
-from eps_estimates_collector import fetch_sp500_pe_ratio
+from factset_report_analyzer import SP500
 
 # Auto-loads CSV from public URL and S&P 500 prices from yfinance
-pe_df = fetch_sp500_pe_ratio(type='forward')
+sp500 = SP500()
+pe_df = sp500.pe_ratio
 print(pe_df)
+
+# Switch to trailing type
+sp500.set_type('trailing')
+pe_trailing = sp500.pe_ratio
+print(pe_trailing)
 ```
 
 ## GitHub Actions
@@ -393,6 +422,12 @@ R2_SECRET_ACCESS_KEY
 
 ## Recent Updates
 
+### v0.4.0 (2025-11-21) - Package Rename & Refactoring
+- ✅ **Package Rename**: `eps-estimates-collector` → `factset-report-analyzer` - clearer naming reflecting FactSet report analysis focus
+- ✅ **Module Rename**: `analysis/pe_ratio.py` → `analysis/sp500.py` - better organization
+- ✅ **API Improvements**: Enhanced `SP500` class with better data caching and type switching
+- ✅ **Documentation**: Updated all README files with new package name and structure
+
 ### v0.3.2 (2025-11-21) - Minor fixes
 - ✅ **PyPI README update**: Added Current P/E Ratio Analysis section with auto-updated graph
 
@@ -400,7 +435,7 @@ R2_SECRET_ACCESS_KEY
 - ✅ **Add matplotlib dependency**: Required for P/E ratio graph generation
 
 ### v0.3.0 (2025-11-20) - P/E Ratio API & Calculation Improvements
-- ✅ **API Rename**: `calculate_pe_ratio()` → `fetch_sp500_pe_ratio()` - clearer naming for S&P 500 specific function
+- ✅ **API Refactor**: `fetch_sp500_pe_ratio()` → `SP500` class - object-oriented design for better data management
 - ✅ **P/E Type Simplification**: Only `forward` and `trailing` types supported (removed `mix` and `trailing-like`)
   - `forward`: Q(0)+Q(1)+Q(2)+Q(3) - Report date quarter and next 3 quarters
   - `trailing`: Q(-4)+Q(-3)+Q(-2)+Q(-1) - Last 4 quarters before report date
@@ -415,7 +450,7 @@ R2_SECRET_ACCESS_KEY
 - ✅ Added GitHub links (`project.urls`)
 
 ### v0.2.4 (2025-11-20) - Import Path Fix
-- ✅ Changed to relative imports (`src.eps_estimates_collector` → `...utils`)
+- ✅ Changed to relative imports (`src.factset_report_analyzer` → `...utils`)
 - ✅ Fixed import errors after package installation
 
 ### v0.2.3 (2025-11-20) - P/E Ratio Calculation Fix

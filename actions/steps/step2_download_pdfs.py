@@ -3,7 +3,7 @@
 from datetime import datetime
 from pathlib import Path
 
-from src.eps_estimates_collector import download_pdfs
+from src.factset_report_analyzer import download_pdfs
 
 
 def download_new_pdfs(

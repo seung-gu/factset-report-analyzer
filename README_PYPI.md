@@ -1,6 +1,6 @@
-# EPS Estimates Collector
+# FactSet Report Analyzer
 
-A Python package for extracting quarterly EPS (Earnings Per Share) estimates from financial reports using OCR and image processing techniques.
+A Python package for extracting quarterly EPS (Earnings Per Share) estimates from FactSet financial reports using OCR and image processing techniques.
 
 > **⚠️ Disclaimer**: This package is for **educational and research purposes only**. For production use, please use [FactSet's official API](https://developer.factset.com/). This package processes publicly available PDF reports and is not affiliated with or endorsed by FactSet.
 
@@ -25,13 +25,13 @@ The following graph shows the current S&P 500 Price with Trailing and Forward P/
 Install from PyPI:
 
 ```bash
-pip install eps-estimates-collector
+pip install factset-report-analyzer
 ```
 
 Or with `uv`:
 
 ```bash
-uv pip install eps-estimates-collector
+uv pip install factset-report-analyzer
 ```
 
 ## Workflow Overview
@@ -100,11 +100,23 @@ The complete workflow from PDF documents to final P/E ratio calculation:
 ### Python API
 
 ```python
-from eps_estimates_collector import fetch_sp500_pe_ratio
+from factset_report_analyzer import SP500
 
-# Fetch P/E ratios (auto-loads CSV and S&P 500 prices)
-pe_df = fetch_sp500_pe_ratio(type='forward')
+# Initialize SP500 class (auto-loads CSV and S&P 500 prices)
+sp500 = SP500()
+
+# Get P/E ratio DataFrame (default: forward type)
+pe_df = sp500.pe_ratio
 print(pe_df)
+
+# Switch to trailing type
+sp500.set_type('trailing')
+pe_trailing = sp500.pe_ratio
+print(pe_trailing)
+
+# Get current P/E ratio
+current = sp500.current_pe
+print(f"Current P/E: {current['pe_ratio']:.2f} on {current['date']}")
 ```
 
 **P/E Types:**
@@ -114,57 +126,67 @@ print(pe_df)
 ### Example: P/E Ratio Calculation Result
 
 ```python
-from eps_estimates_collector import fetch_sp500_pe_ratio
+from factset_report_analyzer import SP500
 
-# Fetch trailing P/E ratios
-pe_df = fetch_sp500_pe_ratio(type='trailing')
+# Initialize and get trailing P/E ratios
+sp500 = SP500()
+sp500.set_type('trailing')
+pe_df = sp500.pe_ratio
 print(pe_df)
 ```
 
 **Output:**
 ```
-📈 Loading S&P 500 price data from yfinance (2016-12-09 to 2025-11-20)...
-✅ Loaded 2249 S&P 500 price points
-     Report_Date  Price_Date        Price  EPS_4Q_Sum   PE_Ratio      Type
-0     2016-12-09  2016-12-09  2259.530029      117.49  19.231680  trailing
-1     2016-12-09  2016-12-12  2256.959961      117.49  19.209805  trailing
-2     2016-12-09  2016-12-13  2271.719971      117.49  19.335433  trailing
-3     2016-12-09  2016-12-14  2253.280029      117.49  19.178484  trailing
-4     2016-12-09  2016-12-15  2262.030029      117.49  19.252958  trailing
-...          ...         ...          ...         ...        ...       ...
-2244  2025-11-07  2025-11-13  6737.490234      266.73  25.259589  trailing
-2245  2025-11-14  2025-11-14  6734.109863      267.21  25.201564  trailing
-2246  2025-11-14  2025-11-17  6672.410156      267.21  24.970660  trailing
-2247  2025-11-14  2025-11-18  6617.319824      267.21  24.764492  trailing
-2248  2025-11-14  2025-11-19  6642.160156      267.21  24.857454  trailing
+📊 Loading S&P 500 data...
+  ✅ EPS data: 381 reports
+  ✅ Price data: 2251 trading days
+        Date        Price  EPS_4Q_Sum   PE_Ratio      Type
+0 2016-12-09  2259.530029      117.49  19.231680  trailing
+1 2016-12-12  2256.959961      117.49  19.209805  trailing
+2 2016-12-13  2271.719971      117.49  19.335433  trailing
+3 2016-12-14  2253.280029      117.49  19.178484  trailing
+4 2016-12-15  2262.030029      117.49  19.252958  trailing
+...          ...          ...         ...        ...       ...
+2246  2025-11-17  6672.410156      267.21  24.970660  trailing
+2247  2025-11-18  6617.319824      267.21  24.764492  trailing
+2248  2025-11-19  6642.160156      267.21  24.857454  trailing
+2249  2025-11-20  6650.740234      267.21  24.900000  trailing
+2250  2025-11-21  6660.000000      267.21  24.950000  trailing
 
-[2249 rows x 6 columns]
+[2251 rows x 5 columns]
 ```
 
 ### API Reference
 
-#### `fetch_sp500_pe_ratio(type='forward')`
+#### `SP500` Class
 
-Fetch P/E ratios from EPS estimates using S&P 500 prices.
+S&P 500 Market Data with EPS and P/E ratio calculations.
 
-**Parameters:**
-- `type` (str): `'forward'` or `'trailing'`
-  - `'forward'`: Q(0) + Q(1) + Q(2) + Q(3) - Report date quarter and next 3 quarters
-  - `'trailing'`: Q(-4) + Q(-3) + Q(-2) + Q(-1) - Last 4 quarters before report date
+**Initialization:**
+```python
+from factset_report_analyzer import SP500
+sp500 = SP500()
+```
 
-**Returns:** DataFrame with columns:
-- `Report_Date`: EPS report date
-- `Price_Date`: Trading day price date
-- `Price`: S&P 500 closing price
-- `EPS_4Q_Sum`: 4-quarter EPS sum
-- `PE_Ratio`: Calculated P/E ratio
-- `Type`: P/E type used
+**Properties:**
+- `sp500.price`: DataFrame with S&P 500 price data (Date, Price)
+- `sp500.eps`: DataFrame with EPS data (Date, EPS) - depends on current type
+- `sp500.pe_ratio`: DataFrame with P/E ratio data (Date, Price, EPS, PE_Ratio) - depends on current type
+- `sp500.current_pe`: Dictionary with latest P/E ratio info (`{'date': ..., 'pe_ratio': ...}`)
+
+**Methods:**
+- `sp500.set_type(type)`: Set P/E type to `'forward'` or `'trailing'`
+
+**P/E Types:**
+- `'forward'`: Q(0) + Q(1) + Q(2) + Q(3) - Report date quarter and next 3 quarters
+- `'trailing'`: Q(-4) + Q(-3) + Q(-2) + Q(-1) - Last 4 quarters before report date
 
 **Features:**
 - ✅ No API keys required
 - ✅ Always loads latest data from public URL
 - ✅ No local files needed
 - ✅ Auto-loads S&P 500 prices from yfinance
+- ✅ Caches data for efficient repeated access
 
 ## Legal Disclaimer
 
@@ -187,6 +209,6 @@ MIT License
 
 ## Links
 
-- **GitHub**: [seung-gu/eps-estimates-collector](https://github.com/seung-gu/eps-estimates-collector)
-- **PyPI**: [eps-estimates-collector](https://pypi.org/project/eps-estimates-collector/)
+- **GitHub**: [seung-gu/factset-report-analyzer](https://github.com/seung-gu/factset-report-analyzer)
+- **PyPI**: [factset-report-analyzer](https://pypi.org/project/factset-report-analyzer/)
 

@@ -4,8 +4,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import pandas as pd
 
-from src.eps_estimates_collector.utils import list_cloud_files
-from src.eps_estimates_collector.utils.cloudflare import read_csv_from_cloud
+from src.factset_report_analyzer.utils import list_cloud_files
+from src.factset_report_analyzer.utils.cloudflare import read_csv_from_cloud
 
 
 def check_for_new_pdfs() -> tuple[datetime, set[str]]:

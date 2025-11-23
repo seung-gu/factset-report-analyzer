@@ -1,4 +1,4 @@
-"""EPS Estimates Collector - Unified API for collecting and analyzing EPS estimates.
+"""FactSet Report Analyzer - Unified API for collecting and analyzing EPS estimates from FactSet reports.
 
 This package provides a comprehensive toolkit for:
 - Downloading FactSet Earnings Insight PDFs
@@ -7,7 +7,7 @@ This package provides a comprehensive toolkit for:
 - Calculating P/E ratios from EPS estimates
 
 Example:
-    >>> from eps_estimates_collector import download_pdfs, extract_charts, process_images, fetch_sp500_pe_ratio
+    >>> from factset_report_analyzer import SP500, download_pdfs, extract_charts, process_images
     >>> from datetime import datetime
     >>> from pathlib import Path
     >>> 
@@ -27,23 +27,23 @@ Example:
     ...     output_csv=Path("output/estimates.csv")
     ... )
     >>> 
-    >>> # Fetch P/E ratios
-    >>> pe_df = fetch_sp500_pe_ratio(
-    ...     csv_path=Path("output/estimates.csv"),
-    ...     price_data={'2024-01-15': 150.5, '2024-02-15': 152.3},
-    ...     type='forward'
-    ... )
+    >>> # Get P/E ratios using SP500 class
+    >>> sp500 = SP500()
+    >>> pe_df = sp500.pe_ratio  # forward (default)
+    >>> sp500.set_type('trailing')
+    >>> pe_trailing = sp500.pe_ratio
 """
 
 from .core import download_pdfs, extract_charts, process_images, process_image
-from .analysis import fetch_sp500_pe_ratio
+from .analysis import SP500, plot_pe_ratio_with_price
 
-__version__ = "0.3.2"
+__version__ = "0.4.0"
 
 __all__ = [
     'download_pdfs',
     'extract_charts',
     'process_images',
     'process_image',
-    'fetch_sp500_pe_ratio',
+    'SP500',
+    'plot_pe_ratio_with_price',
 ]

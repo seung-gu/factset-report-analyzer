@@ -3,7 +3,7 @@
 from pathlib import Path
 import pandas as pd
 
-from src.eps_estimates_collector import process_images
+from src.factset_report_analyzer import process_images
 
 
 def process_chart_images(directory: Path) -> tuple[pd.DataFrame, pd.DataFrame]:

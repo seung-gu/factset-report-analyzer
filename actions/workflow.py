@@ -19,7 +19,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.eps_estimates_collector.utils import CLOUD_STORAGE_ENABLED
+from src.factset_report_analyzer.utils import CLOUD_STORAGE_ENABLED
 from actions.steps import (
     check_for_new_pdfs,
     download_new_pdfs,

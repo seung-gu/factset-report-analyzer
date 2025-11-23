@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-from src.eps_estimates_collector.utils import upload_to_cloud
-from src.eps_estimates_collector.utils.cloudflare import write_csv_to_cloud
+from src.factset_report_analyzer.utils import upload_to_cloud
+from src.factset_report_analyzer.utils.cloudflare import write_csv_to_cloud
 import pandas as pd
 
 
