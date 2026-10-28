@@ -598,7 +598,7 @@ See [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md) for detailed technical documentatio
 
 ## License
 
-MIT License - See [LICENSE](LICENSE) file for details.
+MIT License - See [LICENSE](https://github.com/seung-gu/factset-report-analyzer/blob/main/LICENSE) file for details.
 
 ## Acknowledgments
 
