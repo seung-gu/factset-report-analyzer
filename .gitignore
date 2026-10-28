@@ -36,3 +36,5 @@ output/estimates/
 .*
 !.gitignore
 !.github/
+!.gitbook.yaml
+!.gitbook/
